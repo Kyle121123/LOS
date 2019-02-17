@@ -1,0 +1,1626 @@
+<HTML>
+    <!--
+     Author: Rocqueforte "Rocky" O'Leary (rocqueforte at yahoo dot com dot au)
+     ECEN 404 Authors: Kyle Novak (KLN) and Justin Velasquez
+     
+     Build 001 - 2014-03-18
+     - Initial version (obviously!)
+     - Known bug #1: 
+     * Algorithm doesn't give correct path when XSign is zero 
+     i.e. when the BattleTech start and end Y co-ordinates 
+     are the same AND the BattleTech start and end X 
+     co-ordinates are either both odd or both even.
+     * Fixed with a "kludge" in Build 003
+     
+     Build 002 - 2014-03-18
+     - Fixed error in conversion between Zvolsky and BTech co-ords
+     - Added "Range" to output
+     
+     Build 003 - 2014-03-20
+     - Added "kludge" to fix known bug #1 (see above)
+     - Changed out-of-bounds check in while loops so it now uses
+     "Range" rather than "Step" to see if target hex can't be
+     reached
+     - Added function (ZeroPad) to "zero pad" numbers less than 10
+     
+     Build 004 - 2014-03-20
+     - Fixed range problem in "kludge" code (was reporting range at half
+     of what it should be)
+     
+     Build 005 - 2014-03-21
+     - Added an on-screen map to draw LoS line 
+     
+     Build 007 - 2014-03-21
+     - Reduced size of on-screen map images by half so I can now display
+     a 2 x 2 maps mapboard
+     
+     Build 008 - 2014-03-23
+     - Added "context.beginPath();" and "context.closePath();" to LoS
+     drawing "bit" (need this if I want multiple different coloured lines)
+     - Changed versioning from number.subnumber (e.g. 1.31) to a simple 
+     incremental build number
+     
+     Build 009 - 2014-03-26
+     - Increased size of map image from 570 x 700 to 576 x 708 as this
+     new size scales nicely for 1,2,3 or 4 maps on screen. Needed to
+     recalculate formula for drawing LoS due to this (and actually improved
+     it)!
+     - Added two new map images (Open Terrain 1 and Rolling Hills 2), and
+     added test code to rotate map so we can have both North-South and South-North
+     orientation
+     
+     Build 010 - 2014-03-29
+     - Added arrowhead to Line-of-Sight line (using code from 
+     http://stackoverflow.com/questions/16025326/html-5-canvas-complete-arrowhead )
+     
+     Build 011 - 2014-04-01
+     - Added black and white unit markers (code needs to be tidied a bit to handle
+     different resolution of maps (i.e whether we are using just one single map
+     or multiple maps (up to 3 x 3 of course!))
+     - No April Fool's Day jokes...sorry!
+     
+     Build 012 - 2014-04-12
+     - Added elevation and facing inputs - they don't actually do anything yet, but
+     it's a start on getting back into coding this thing! :-) 
+     - Note on elevation: this is for airbourne units - i.e. elevation is a unit's 
+     height above the base terrain and excluding a unit's own height.
+     For example, a 'Mech standing on a level 2 hill would enter an elevation of 0
+     - Also added torso twist directions (not used at the moment, but will be needed
+     for firing arc calculations)
+     
+     Build 013 - 2014-04-20
+     - Working on modifing Calculate LOS so we can step through the function twice if 
+     the LoS passes through two alternate paths
+     - Moved code to draw the LoS line and arrowheads to seperate functions
+     
+     Build 014 - 2016-07-22
+     - Fixed the problem with the "kludge fix" going in the wrong direction
+     when working out it's LoS (used the wrong less than / greater than
+     symbol
+     - Handed code over to Western Sydney Uni SCEM Professional Experience team
+     
+     Build 015 - 2016-10-10
+     - Fixed Kludge section so LOSPath is added to two arrays
+     - Fixed what happens when LOSPath nicks an edge (Epislon = 0)
+     so range is calculated correctly and path is calculated properly.
+     - OutString (storing output info as we go for display at end of program) 
+     now replaced by NewOutString which actually loops through the
+     XPath and YPath arrays.
+     
+     Testing
+     - Make sure "weird" circumstances work out okay.
+     - 2016-10-10 Hexes 07,09 -> 14,16 **Works Fine**
+     
+     To Do:
+     - Add a data structure to store map terrain features, and then calculate if
+     any terrain features block and / or modify LoS. Elevation and "dead zones"
+     will be important to calculate here.
+     
+     - Implement a way of saying which firing arc target hex is in, and what
+     attack direction target hex is hit from
+     
+     - Add support for playing area of up to 3 x 3 maps, with users able to 
+     select which offical map each map is (e.g. Open Terrain, Rolling Hills #2 
+     etc etc)
+     
+     - Add in a way to have multiple units (in two teams - Black and White) on
+     the map, and then calculate LoS to opposing units for each unit. 
+     
+     - Leading on from above, add a way to move units via the mouse rather than
+     having to type their hex locations in
+     
+     - Make the program work with a Samsung Android tablet.
+     
+     - Check to see how program works (or doesn't!) with browsers other than
+     Firefox.
+     -->
+    
+    <BODY>
+        <HR>
+        <H2>Battletech Line-of-Sight Calculator</H2>
+        Build 019 - 2018-12-06
+        <HR>
+        <FONT SIZE=-1>
+            Based on an algorithm by Ivan Zvolsky
+            <A HREF="http://zvold.blogspot.com.au/2010/02/line-of-sight-on-hexagonal-grid.html">
+                http://zvold.blogspot.com.au/2010/02/line-of-sight-on-hexagonal-grid.html</A>
+            <P>
+                For an understanding of hex co-ordinate systems (and much more hex stuff!),
+                I strongly recommended Amit Patel's <A HREF="http://www.redblobgames.com/">
+                    Red Blob Games</A> site, and in particular
+                <A HREF="http://www.redblobgames.com/grids/hexagons/">
+                    http://www.redblobgames.com/grids/hexagons/</A>
+                <P>
+                    For a blank, numbered BattleTech map, please click <A HREF="BlankBattleTechMap.pdf">here</A> [PDF,
+                    123Kb]
+                    <p>
+                        Senior Design Capstone Fall 2018, email Kyle121123@tamu.edu or j.velasquez77@tamu.edu for any
+                        questions
+        </FONT>
+        <P>
+            <HR>
+            <TABLE BORDER=1>
+                <TR>
+                    <TD VALIGN=TOP>
+                        Map:<select id="ChooseMapVal">
+                            <OPTION SELECTED VALUE=1> 1X1 B-Tech
+                            <OPTION VALUE=2>1X1 Open Terrain
+                            <OPTION VALUE=3>1X1 Rolling Hills
+                            <OPTION VALUE=4>2X2 B-Tech #2
+                            <OPTION VALUE=5>2x2 Open Terrain #2
+                            <OPTION VALUE=6>2x2 Rolling Hills #2
+                            <OPTION Value=7>3x3 Land O'Lakes
+                            <OPTION VALUE=8>3x3 Eagle Mountain
+                            <OPTION VALUE=9>3x3 Death Valley
+                        </SELECT>
+                        Unit:<select id="FUnitValue">
+                            <Option SELECTED VALUE=1> Black#1
+                        </select>
+                        Enemy Unit:<select id="EUnitValue">
+                            <Option SELECTED VALUE=1> Black#1
+                        </select>
+                        <P>
+                            <TABLE BORDER=1>
+                                <TR>
+                                    <TD VALIGN=TOP>
+                                        Choose Firing Range:<input type="text" id="FiringRange" size=2 maxlength=2 value="">
+                                        <P>
+                                            Choose # Units Per Team:<input type="text" id="TeamSize" size=2 maxlength=2
+                                                value="">
+                                            <P>
+                                                Attacking Mech <FONT SIZE=0> (e.g. X:01 Y:01)</FONT><BR>
+                                                X:<input type="text" id="ARCStartX" size=2 maxlength=2 value="">
+                                                Y:<input type="text" id="ARCStartY" size=2 maxlength=2 value="">
+                                                Facing:<SELECT name="StartFacing">
+                                                    <OPTION SELECTED VALUE=1>1
+                                                    <OPTION VALUE=2>2
+                                                    <OPTION VALUE=3>3
+                                                    <OPTION VALUE=4>4
+                                                    <OPTION VALUE=5>5
+                                                    <OPTION VALUE=6>6
+                                                </SELECT>
+                                                Torso Twist:<SELECT name="StartTorso">
+                                                    <OPTION SELECTED VALUE=1>Straight
+                                                    <OPTION VALUE=2>Left
+                                                    <OPTION VALUE=3>Right
+                                                </SELECT>
+                                                <P>
+                                                    Target Mech <FONT SIZE=0> (e.g. X:15 Y:17)</FONT><BR>
+                                                    X:<input type="text" id="ARCEndX" size=2 maxlength=2 value="">
+                                                    Y:<input type="text" id="ARCEndY" size=2 maxlength=2 value="">
+                                                    Facing:<SELECT name="EndFacing">
+                                                        <OPTION SELECTED VALUE=1>1
+                                                        <OPTION VALUE=2>2
+                                                        <OPTION VALUE=3>3
+                                                        <OPTION VALUE=4>4
+                                                        <OPTION VALUE=5>5
+                                                        <OPTION VALUE=6>6
+                                                    </SELECT>
+                                                    Torso Twist:<SELECT name="EndTorso">
+                                                        <OPTION SELECTED VALUE=1>Straight
+                                                        <OPTION VALUE=2>Left
+                                                        <OPTION VALUE=3>Right
+                                                    </SELECT>
+                                                    <P>
+                                                        <BUTTON onclick="CalculateARC()">Calculate LOS</button>
+                                                        <BUTTON onclick="location.reload(true)">Reload</button>
+                                                        <Button onclick="ChooseMap()">Load Map</Button>
+                                                        <Button onclick="placeUnits()">Place Units</Button>
+                                                        <Button onclick="UnitLOS()">Unit LOS</Button>
+                                                        <BR>
+                                                        <TEXTAREA ID="TextBox" COLS=60 ROWS=30></TEXTAREA>
+                                    </TD>
+                                    <TD>
+                                        <canvas id="myCanvas" width="576" height="708"></canvas>
+                                    </TD>
+                                </TR>
+                            </TABLE>
+                            <P id="LOS"></p>
+                            <SCRIPT>
+    
+                                // Global variable for info to be displayed on screen
+                                var OutString = "";
+                                var terrainCounter = 0;
+                                var ArcOutString = "";
+                                var unitLosCheck = 1;
+                                //These 4 global variables pass the values of black and white 
+                                var startTechX = 0;
+                                var startTechY = 0;
+                                var enmyTechX = 0;
+                                var enmyTechY = 0;
+                                // Variables for displaying map on screen
+                                var canvas = document.getElementById('myCanvas');
+                                var context = canvas.getContext('2d');
+                                var imageObj1 = new Image();
+                                var imageObj2 = new Image();
+                                var imageObj3 = new Image();
+                                var imageObj4 = new Image();
+    
+                                // Variables for displaying units on screen
+                                var UnitWhite = new Image();
+                                var UnitBlack = new Image();
+    
+                                // Arrays to store LoS Paths
+                                var XPath = new Array();
+                                var YPath = new Array();
+                                XPath[1] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+                                YPath[1] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+                                XPath[2] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+                                YPath[2] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+                                var XPathFinal = new Array();
+                                var YPathFinal1 = new Array();
+    
+                                // Arrays to store Firing Arc Paths
+                                var XArc = new Array();
+                                var YArc = new Array();
+                                XArc[1] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+                                YArc[1] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+                                XArc[2] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+                                YArc[2] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+                                var XArcFinal = new Array();
+                                var YArcFinal1 = new Array();
+    
+                                // Variable to store how many times we've looped through CalculateLOS function
+                                var LOSPass = 0;
+    
+                                // Variable to store how many times we've looped through CalculateARC function
+                                var ARCPass = 0;
+                                //Variable from the drop-down menu to determine the map in use
+                                var chooseMapValue = 0;
+                                //Global array to store values of the array, I'm doing increments of three with each special hexagon 
+                                //having the chatacteristics of battle-tech coordinates and last for type 
+                                var terrainType = new Array();
+                                //Increments of 3 for each hexagon involved.
+                                //Global variable to save place in array
+                                //Need a similar array to store the values of the black and white hexagons
+                                var storeHexVal = new Array();
+    
+                                var terrainTypeCount = 0;
+                                // Function to load map and unit images
+                                //KLN should automatically upload when the webpage loads
+                                this.onload = function () {
+                                    // Source files for images
+                                    imageObj1.src = 'Map-BTech.jpg';
+                                    imageObj2.src = 'Map-RollingHills2.jpg';
+                                    imageObj3.src = 'Map-OpenTerrain1.jpg';
+                                    imageObj4.src = 'Map-BTech.jpg';
+                                    UnitWhite.src = 'UnitHexWhite.png';
+                                    UnitBlack.src = 'UnitHexBlack.png';
+                                    window.alert("Welcome to the Battle-Tech Battleboard Calculator!!! Please start by selecting a map, choose the firing range, and then place the units. Enjoy!");
+    
+    
+                                    // As a proof-of-concept, I'm going to rotate the first map through
+                                    // 180 degrees
+                                    // First, save the existing canvas co-ord system
+                                    context.save();
+                                    // set a point we're going to rotate the map around (bottom
+                                    // right corner)
+                                    // a context.translate(288, 354);
+                                    // Rotate the map 180 degrees
+                                    // a context.rotate(Math.PI);
+                                    // Draw the map
+    
+                                    //We will make this map 3x3 instead of 2x2 by increasing the 288, 354 by 3/2. 
+                                    //288 =x, 354= y
+                                    //context.drawImage(imageObj1, 0, 0, 288, 354);
+                                    // Restore the old canvas co-ord system
+                                    // a context.restore();
+                                    // Draw the next three maps in their usual spots
+                                    // Note the last number pairs specify the width and height
+                                    // of the image (actual images are 576 x 708)
+                                    //context.drawImage(imageObj2, 288, 0, 288, 354);
+                                    //context.drawImage(imageObj3, 0, 354, 288, 354);
+                                    //context.drawImage(imageObj4, 288, 354, 288, 354);
+    
+                                    //Kyle's notes
+                                    //For 3x3 maps
+                                    //context.drawImage(imageObjn, 288, 354, 288, 354);
+                                };
+    
+    
+    
+                                // TAMU: Add an event listener to detect when mouse click occurs
+                                myCanvas.addEventListener('mousedown', onDown, false);
+    
+                                function onDown(event) {
+                                    px = event.pageX;
+                                    py = event.pageY;
+    
+                                    if (px >= 484 && px < 1336 && py >= 298 && py < 1360) {
+                                        PixToHex(px, py);
+                                    }
+    
+                                    console.log(px);
+                                    console.log(py);
+                                    console.log(hx);
+                                    console.log(hy);
+    
+                                }
+    
+                                // Converts pixel coordinates picked up by mouse click into BTech coordinates
+                                function PixToHex(px, py) {
+                                    pHexSize = 12;
+    
+                                    // Account for origin of canvas not being on origin of page
+                                    px = px - 484;
+                                    py = py - 298;
+    
+                                    // tilingWidth
+                                    // |   |
+                                    //  _     _
+                                    // / \_    tilingHeight
+                                    // \_/ \  _
+                                    //   \_/
+    
+                                    tilingWidth = pHexSize * 3 / 2;
+                                    tilingHeight = pHexSize;
+    
+                                    hx = px / tilingWidth * 2;
+                                    xMod = px % tilingWidth;
+                                    hy = py / tilingHeight;
+                                    yMod = py % tilingHeight;
+    
+                                    if (yMod < tilingHeight / 2) {
+                                        if ((xMod * 2 + yMod) < (pHexSize / 2)) {
+                                            --hx;
+                                            --hy;
+                                        }
+                                        else if ((xMod * 2 - yMod) < (pHexSize * 3 / 2)) {
+                                            // do nothing
+                                        }
+                                        else {
+                                            ++hx;
+                                            --hy;
+                                        }
+                                    }
+                                    else {
+                                        if ((xMod * 2 - (yMod - pHexSize / 2)) < 0) {
+                                            --hx;
+                                        }
+                                        else if ((xMod * 2 + (yMod - pHexSize / 2)) < pHexSize * 2) {
+                                            // do nothing
+                                        }
+                                        else {
+                                            ++hx;
+                                        }
+                                    }
+                                }
+    
+                                function ChooseMap() {
+                                    //Let the user decide if the map should be 2x2 or 3x3 
+                                    //let text;
+                                    //This function will allow the user to change the map layout for the map calculations
+                                    //288 =x, 354= y
+    
+                                    //Create the Map based on which map and nxn dimensioned board
+                                    chooseMapValue = document.getElementById("ChooseMapVal");
+                                    generateMap(chooseMapValue.value);
+    
+    
+                                    //Temp placement
+                                    //context.drawImage(imageObj1, 0, 0, 288, 354);
+                                    // Restore the old canvas co-ord system
+                                    // a context.restore();
+                                    // Draw the next three maps in their usual spots
+                                    // Note the last number pairs specify the width and height
+                                    // of the image (actual images are 576 x 708)
+                                    //context.drawImage(imageObj2, 288, 0, 288, 354);
+                                    //context.drawImage(imageObj3, 0, 354, 288, 354);
+                                    //context.drawImage(imageObj4, 288, 354, 288, 354);
+                                    //This is were we will enable 3x3 map sizes by modifying the canvas and
+                                    //then adding the context.drawImage functions
+                                }
+                                function generateMap(mapType) {
+                                    //Make sure to erase the array if the map changes
+                                    //We also need to erase all unit dropdown values besides black #1
+                                    //
+                                    //
+                                    //
+    
+                                    //terra
+                                    terrainType.length = 0;
+                                    context.clearRect(0, 0, canvas.width, canvas.height);
+    
+                                    switch (parseInt(mapType)) {
+                                        case 1:
+                                            document.getElementById('myCanvas').width = 288;
+                                            document.getElementById('myCanvas').height = 354;
+                                            context.drawImage(imageObj1, 0, 0, 288, 354);
+                                            break;
+                                        case 2:
+                                            document.getElementById('myCanvas').width = 288;
+                                            document.getElementById('myCanvas').height = 354;
+                                            context.drawImage(imageObj2, 0, 0, 288, 354);
+                                            break;
+                                        case 3:
+                                            document.getElementById('myCanvas').width = 288;
+                                            document.getElementById('myCanvas').height = 354;
+                                            context.drawImage(imageObj3, 0, 0, 288, 354);
+                                            break;
+                                        case 4:
+                                            document.getElementById('myCanvas').width = 576;
+                                            document.getElementById('myCanvas').height = 708;
+                                            context.drawImage(imageObj1, 0, 0, 288, 354);
+                                            // Draw the next three maps in their usual spots
+                                            // Note the last number pairs specify the width and height
+                                            // of the image (actual images are 576 x 708)
+                                            context.drawImage(imageObj2, 288, 0, 288, 354);
+                                            context.drawImage(imageObj3, 0, 354, 288, 354);
+                                            context.drawImage(imageObj4, 288, 354, 288, 354);
+                                            break;
+                                        case 5:
+                                            document.getElementById('myCanvas').width = 576;
+                                            document.getElementById('myCanvas').height = 708;
+                                            context.drawImage(imageObj2, 0, 0, 288, 354);
+                                            context.drawImage(imageObj3, 288, 0, 288, 354);
+                                            context.drawImage(imageObj1, 0, 354, 288, 354);
+                                            context.drawImage(imageObj2, 288, 354, 288, 354);
+                                            break;
+                                        case 6:
+                                            document.getElementById('myCanvas').width = 576;
+                                            document.getElementById('myCanvas').height = 708;
+                                            context.drawImage(imageObj3, 0, 0, 288, 354);
+                                            context.drawImage(imageObj1, 288, 0, 288, 354);
+                                            context.drawImage(imageObj2, 0, 354, 288, 354);
+                                            context.drawImage(imageObj3, 288, 354, 288, 354);
+                                            break;
+                                        case 7:
+                                            document.getElementById('myCanvas').width = 864;
+                                            document.getElementById('myCanvas').height = 1062;
+                                            //Go row by row: Row1
+                                            context.drawImage(imageObj1, 0, 0, 288, 354);
+                                            // Restore the old canvas co-ord system
+                                            // a context.restore();
+                                            // Draw the next three maps in their usual spots
+                                            // Note the last number pairs specify the width and height
+                                            // of the image (actual images are 576 x 708)
+                                            context.drawImage(imageObj2, 288, 0, 288, 354);
+                                            context.drawImage(imageObj1, 576, 0, 288, 354);
+                                            //Row 2:
+                                            context.drawImage(imageObj3, 0, 354, 288, 354);
+                                            context.drawImage(imageObj4, 288, 354, 288, 354);
+                                            context.drawImage(imageObj3, 576, 354, 288, 354);
+                                            //Row 3
+                                            context.drawImage(imageObj1, 0, 708, 288, 354);
+                                            context.drawImage(imageObj2, 288, 708, 288, 354);
+                                            context.drawImage(imageObj1, 576, 708, 288, 354);
+                                            break;
+                                        case 8:
+                                            document.getElementById('myCanvas').width = 864;
+                                            document.getElementById('myCanvas').height = 1062;
+                                            context.drawImage(imageObj3, 0, 0, 288, 354);
+                                            context.drawImage(imageObj1, 288, 0, 288, 354);
+                                            context.drawImage(imageObj3, 576, 0, 288, 354);
+                                            //Row 2:
+                                            context.drawImage(imageObj3, 0, 354, 288, 354);
+                                            context.drawImage(imageObj2, 288, 354, 288, 354);
+                                            context.drawImage(imageObj3, 576, 354, 288, 354);
+                                            //Row 3
+                                            context.drawImage(imageObj3, 0, 708, 288, 354);
+                                            context.drawImage(imageObj1, 288, 708, 288, 354);
+                                            context.drawImage(imageObj3, 576, 708, 288, 354);
+                                            break;
+                                        case 9:
+                                            document.getElementById('myCanvas').width = 864;
+                                            document.getElementById('myCanvas').height = 1062;
+                                            context.drawImage(imageObj2, 0, 0, 288, 354);
+                                            context.drawImage(imageObj3, 288, 0, 288, 354);
+                                            context.drawImage(imageObj2, 576, 0, 288, 354);
+                                            //Row 2:
+                                            context.drawImage(imageObj2, 0, 354, 288, 354);
+                                            context.drawImage(imageObj1, 288, 354, 288, 354);
+                                            context.drawImage(imageObj2, 576, 354, 288, 354);
+                                            //Row 3
+                                            context.drawImage(imageObj2, 0, 708, 288, 354);
+                                            context.drawImage(imageObj3, 288, 708, 288, 354);
+                                            context.drawImage(imageObj2, 576, 708, 288, 354);
+                                            break;
+    
+                                    }
+    
+                                }
+                                //This function will place all the appropiate untis on the board in their corresponding spots and
+                                ///save the terrain values of the markers
+                                function placeUnits() {
+                                    //First ask for the amount of units that need to be placed on the board
+                                    var unitAmt = parseInt(document.getElementById("TeamSize").value);
+                                    //Now for both units, place the hexagons as well as save terrain elements, will be using a 
+                                    //for loop for this
+                                    var j = 1;
+                                    for (var i = 1; i < (2 * unitAmt + 1); i = i + 1) {
+                                        //First ask for the the battle-tech position of each of the units
+    
+                                        //black goes first
+                                        if (i < (unitAmt + 1)) {
+                                            var unitposX = parseInt(prompt("Please input the battle-tech X coordinate for black unit " + i));
+                                            var unitposY = parseInt(prompt("Please input the battle-tech Y coordinate for black unit " + i));
+    
+                                            //Next, determine the tile type of the piece before placing the white/black hexagon
+                                            hexTerrainCount(unitposX, unitposY);
+                                            //Lastly, place the image on the board
+                                            hexPosX = (unitposX * 36) / 2;
+    
+                                            hexPosY = (((unitposY - 1) * 42) - (unitposY / 4) + 20);
+                                            if (unitposX % 2 == 0) // Offset for even X Btech co-ord hex
+                                            {
+                                                hexPosY = hexPosY + 20;
+                                            }
+                                            hexPosY = hexPosY / 2;
+    
+                                            //Push in the black elements into the array 
+                                            storeHexVal.push(0, i, unitposX, unitposY);
+                                            context.globalAlpha = 0.6;
+                                            context.drawImage(UnitBlack, hexPosX - (10), hexPosY - (8), 20, 16);
+                                            // White text for the Black units
+                                            context.fillStyle = "#FFFFFF";
+                                            context.fillText(i, hexPosX - 3, hexPosY + 3);
+                                            //Place the black unit numbers here
+                                            //2 because the first unit already placed in the dropdown menu
+                                            if (i >= 2) {
+                                                //Now update the dropdown menu to include the next unit, 
+                                                //we will use the select add method
+                                                //Idea: Maybe have a way to label each unit which one they are, ex: unit 1, 2, 3, etc. need to use i
+                                                var x = document.getElementById("FUnitValue");
+                                                var option = document.createElement("option");
+                                                option.value = i;
+                                                option.text = "Black #" + i;
+                                                x.add(option);
+    
+                                                var x = document.getElementById("EUnitValue");
+                                                var option = document.createElement("option");
+                                                option.value = i;
+                                                option.text = "Black #" + i;
+                                                x.add(option);
+                                            }
+    
+                                            //console.log(hexPosX);
+                                            //console.log(hexPosY);
+                                        }
+                                        else {
+                                            //For the white tiles
+                                            var unitposX = parseInt(prompt("Please input the battle-tech X coordinate for white unit " + j));
+                                            var unitposY = parseInt(prompt("Please input the battle-tech Y coordinate for white unit " + j));
+                                            hexTerrainCount(unitposX, unitposY);
+                                            j++;
+                                            hexPosX = (unitposX * 36) / 2;
+    
+                                            hexPosY = (((unitposY - 1) * 42) - (unitposY / 4) + 20);
+                                            if (unitposX % 2 == 0) // Offset for even X Btech co-ord hex
+                                            {
+                                                hexPosY = hexPosY + 20;
+                                            }
+                                            hexPosY = hexPosY / 2;
+                                            //Push the white elements into the array, first element 1 for white 
+                                            storeHexVal.push(1, i, unitposX, unitposY);
+                                            context.globalAlpha = 0.6;
+                                            context.drawImage(UnitWhite, hexPosX - (10), hexPosY - (8), 20, 16);
+                                            //Place the white unit numbers here on the board
+                                            context.globalAlpha = 1;
+                                            context.font = "12px Arial";
+                                            // Black text for the white units
+                                            context.fillStyle = "#000000";
+                                            context.fillText((j - 1), hexPosX - 4, hexPosY + 4);
+                                            //Now update the dropdown menu to include the next unit, 
+                                            //we will use the select add method
+                                            //Idea: Maybe have a way to label each unit which one they are, ex: unit 1, 2, 3, etc. need to use i
+                                            var x = document.getElementById("FUnitValue");
+                                            var option = document.createElement("option");
+                                            option.value = i;
+                                            option.text = "White #" + (j - 1);
+                                            x.add(option);
+    
+                                            var x = document.getElementById("EUnitValue");
+                                            var option = document.createElement("option");
+                                            option.value = i;
+                                            option.text = "White #" + (j - 1);
+                                            x.add(option);
+                                        }
+                                    }
+                                }
+                                function UnitLOS() {
+                                    //This function will calculate the LOS from any black to white unit and vice versa. This function also
+                                    //will label each unit correspondingly unless thats in the placeUnit function 
+                                    //We only need to normal LOS function as well as whatever values that are not going to be manually input
+                                    //This will be used to slightly modify the LOS function for our uses
+                                    //console.log(FUnitValue.value)
+                                    //console.log(EUnitValue.value)
+                                    unitLosCheck = 0;
+                                    //Now overide the start and end coordinates to be from the buttons rather than manual inputs. This will be done by iterating through a 4
+                                    //element array until the scroll button correpsonds with the element of the array, first element is black/white, 2nd is hexagon, 3:X, 4:Y 
+                                    //ex: 1,2,2; 2, 6, 4; 3, 7, 8...
+                                    for (var i = 0; i < (storeHexVal.length + 1); i = i + 4) {
+                                        if (parseInt(FUnitValue.value) == storeHexVal[i + 1]) {
+                                            startTechX = storeHexVal[i + 2];
+                                            startTechY = storeHexVal[i + 3];
+                                        }
+                                        if (parseInt(EUnitValue.value) == storeHexVal[i + 1]) {
+                                            enmyTechX = storeHexVal[i + 2];
+                                            enmyTechY = storeHexVal[i + 3];
+                                        }
+                                    }
+                                    CalculateARC();
+                                    unitLosCheck = 1;
+                                    //Make sure to erase the storeHex val array and remove the hexagons on the map if possible 
+    
+                                }
+    
+                                function CalculateARC() {
+                                    var unitAmt = parseInt(document.getElementById("TeamSize").value);
+                                    // Increment the nunmber of times we've been through this function
+                                    ARCPass++;
+                                    ArcOutString += "Pass #:" + ARCPass + "\n";
+    
+                                    // Flag to see if we need to loop through the function a second time
+                                    DoubleCheck = 0;
+    
+                                    // Counter for each step we take to get from start hex to end hex
+                                    var Step = 0;
+    
+                                    // Counter to calculate range between start hex and end hex
+                                    var Range = 0;
+    
+                                    // Get the start and end hexes entered by user
+                                    // These are entered using the usual BTech co-ord system
+                                    // Get these from the HTML form on first pass through the function,
+                                    // otherwise swap the Start and End Hexes 'cos we're double checking
+                                    // the LOS line
+                                    //The conditional is important when doing the unit to unit calculations, freeform will still have
+                                    //same format 
+                                    if (unitLosCheck == 1) {
+    
+                                        if (ARCPass == 1) {
+                                            var ARCStartX = parseInt(document.getElementById("ARCStartX").value);
+                                            var ARCStartY = parseInt(document.getElementById("ARCStartY").value);
+                                            var ARCEndX = parseInt(document.getElementById("ARCEndX").value);
+                                            var ARCEndY = parseInt(document.getElementById("ARCEndY").value);
+                                        }
+                                        else {
+                                            var ARCStartX = parseInt(document.getElementById("ARCEndX").value);
+                                            var ARCStartY = parseInt(document.getElementById("ARCEndY").value);
+                                            var ARCEndX = parseInt(document.getElementById("ARCStartX").value);
+                                            var ARCEndY = parseInt(document.getElementById("ARCStartY").value);
+                                        }
+    
+                                    }
+                                    else {
+                                        var ARCStartX = startTechX;
+                                        var ARCStartY = startTechY;
+                                        var ARCEndX = enmyTechX;
+                                        var ARCEndY = enmyTechY;
+                                    }
+                                    // Variables for holding start and end pixel co-ords for drawn LoS line
+                                    var DrawStartX = 0;
+                                    var DrawStartY = 0;
+                                    var DrawEndX = 0;
+                                    var DrawEndY = 0;
+    
+                                    // Draw line from start hex to end hex
+                                    DrawStartX = (ARCStartX * 36) / 2;
+    
+                                    DrawStartY = (((ARCStartY - 1) * 42) - (ARCStartY / 4) + 20);
+                                    if (ARCStartX % 2 == 0) // Offset for even X Btech co-ord hex
+                                    {
+                                        DrawStartY = DrawStartY + 20;
+                                    }
+                                    DrawStartY = DrawStartY / 2;
+    
+                                    DrawEndX = (ARCEndX * 36) / 2;
+    
+                                    DrawEndY = (((ARCEndY - 1) * 42) - (ARCEndY / 4) + 20);
+                                    if (ARCEndX % 2 == 0) // Offset for even X Btech co-ord hex
+                                    {
+                                        DrawEndY = DrawEndY + 20;
+                                    }
+                                    DrawEndY = DrawEndY / 2;
+    
+                                    // Calculate angular direction from origin before DrawLine function
+                                    // in order to display direction of attack
+                                    endRadians = Math.atan((DrawEndY - DrawStartY) / (DrawEndX - DrawStartX));
+                                    endRadians += ((DrawEndX >= DrawStartX) ? 90 : -90) * Math.PI / 180;
+    
+                                    // This program does it's calculations using Zvolsky's
+                                    // co-ords, but it needs to display the path using BTech co-ords.
+                                    // These two variables hold the converted co-ords
+                                    var BTHexX = 0;
+                                    var BTHexY = 0;
+    
+                                    // Convert the Battletech hex co-ordinates to the ones used in the
+                                    // supplied algorithm. BTech uses an "even-q" vertical layout co-ord 
+                                    // system, and Zvolsky's algorithm use an "odd-q" vertical layout 
+                                    // co-ord system with the X and Y co-ords swapped (maybe this 
+                                    // would be better described as a "odd-q" horizontal layout?)
+                                    // We modify the Zvolsky X co-ords by +1 for BTech hexes with an
+                                    // even Btech X co-ordinate - this is due to the way the X and Y axis
+                                    // are offset
+                                    StartX = ARCStartY + ((ARCStartX + 1) % 2);
+                                    StartY = ARCStartX;
+                                    EndX = ARCEndY + ((ARCEndX + 1) % 2);
+                                    EndY = ARCEndX;
+    
+                                    // Various variables used by Zvolsky's algorithm
+                                    var TwoDeltaX = (2 * (EndX - StartX)) + Math.abs(EndY % 2) - Math.abs(StartY % 2);
+                                    var DeltaX = (TwoDeltaX / 2);
+                                    var DeltaY = (EndY - StartY);
+                                    var XSign = DeltaX && DeltaX / Math.abs(DeltaX);
+                                    var YSign = DeltaY && DeltaY / Math.abs(DeltaY);
+                                    var SigmaX = Math.abs(TwoDeltaX);
+                                    var SigmaY = Math.abs(DeltaY);
+                                    var ThreeSigmaX = 3 * SigmaX;
+                                    var ThreeSigmaY = 3 * SigmaY;
+    
+                                    // Display the start and end hexes
+                                    ArcOutString += "-----\n";
+                                    ArcOutString += "Start Hex (";
+                                    ZeroPad(ARCStartX);
+                                    ArcOutString += ARCStartX + ",";
+                                    ZeroPad(ARCStartY);
+                                    ArcOutString += ARCStartY + ") -> ";
+                                    ArcOutString += "End Hex (";
+                                    ZeroPad(ARCEndX);
+                                    ArcOutString += ARCEndX + ",";
+                                    ZeroPad(ARCEndY);
+                                    ArcOutString += ARCEndY + ")\n";
+    
+                                    // Put start hex in HexArc Array
+                                    XArc[ARCPass][0] = ARCStartX;
+                                    YArc[ARCPass][0] = ARCStartY;
+    
+                                    // Remove the comment markers ("//") on the two lines below to display
+                                    // the Zvolsky hex co-ords
+                                    // ArcOutString += "Start IVHex ("+StartX+","+StartY+") -> ";
+                                    // ArcOutString += "End IVHex ("+EndX+","+EndY+")\n";
+    
+                                    // Display the internal working variables
+                                    /*
+                                    ArcOutString += "Two Delta X:"+TwoDeltaX+"\n";
+                                    ArcOutString += "Delta X:"+DeltaX+"\n";
+                                    ArcOutString += "Delta Y:"+DeltaY+"\n";
+                                    ArcOutString += "X Sign:"+XSign+"\n";
+                                    ArcOutString += "Y Sign:"+YSign+"\n";
+                                    ArcOutString += "Sigma X:"+SigmaX+"\n";
+                                    ArcOutString += "Sigma Y:"+SigmaY+"\n";
+                                    */
+    
+                                    // Need two variables to hold the hex we're currently in
+                                    // This will change as we step through the algorithm
+                                    var CurrentX = StartX;
+                                    var CurrentY = StartY;
+    
+                                    // A simple switch to tell us if we have hit the target
+                                    // hex yet (0 = no, 1 = yes)
+                                    var EndFound = 0;
+    
+                                    // In case the algorithm hits a bug, we don't want to
+                                    // keep on stepping forever (it will crash the web browser!)
+                                    // So we set a maximum number of hexes to traverse before finishing
+                                    // Default is 38 hexes, as that is the maximum range of any
+                                    // non-artillery weapon in BattleTech!
+    
+                                    var MaxRange = parseInt(document.getElementById("FiringRange").value);
+    
+                                    // These are two variables that are passed to the GetDirection
+                                    // function that tell that function which direction the next hex 
+                                    // is in (Top Left, Top Right, Right, Bottom Right, Bottom Left,
+                                    // Left). 
+                                    var DirX = 0;
+                                    var DirY = 0;
+    
+                                    // Epsilon ("e") from Zvolsky's algorithm
+                                    var Epsilon = (-2 * SigmaX);
+    
+                                    // Display the start of the calculations
+                                    ArcOutString += "Step:0 ";
+                                    ArcOutString += "Hex (";
+                                    ZeroPad(ARCStartX);
+                                    ArcOutString += ARCStartX + ",";
+                                    ZeroPad(ARCStartY);
+                                    ArcOutString += ARCStartY + ")";
+    
+                                    // Remove the comment markers ("//") on the line below to display
+                                    // the Zvolsky hex co-ords
+                                    // ArcOutString += " [IVHex ("+CurrentX+","+CurrentY+")]";
+                                    // Remove the comment markers on the line below to display epsilon
+                                    // ArcOutString += "Epsilon:"+Epsilon;
+                                    ArcOutString += "\n";
+    
+                                    // KLUDGE
+                                    // Quick fix loop to check to see if ARCStartY and ARCEndY are the 
+                                    // the same AND if ARCStartX and ARCEndX are either both even or
+                                    // both odd. If they are, current Zvolsky algorithm doesn't
+                                    // work so this kludge is needed instead
+                                    //
+                                    // Easy way to tell if ARCStartX and ARCEndX are both odd or
+                                    // or both even is to add them together and do a mod 2 on
+                                    // the result (as two odds together and two evens together 
+                                    // always gives you an even product)
+                                    // 
+                                    // 2016-10-10 : Modified Kludge so it now puts two alternate paths
+                                    // into two arays
+    
+                                    if ((ARCStartY == ARCEndY) && ((ARCStartX + ARCEndX) % 2 == 0)) {
+                                        // 2016-10-10 Set the ARCPass flag to 2, as there will be two paths
+                                        // calculate
+                                        ARCPass = 2;
+                                        // Need to see if we need to move left or right 
+                                        var XMod = 0;
+                                        // 2016-09-27
+                                        // I was comparing the start X co-ord to the end Y co-ord,
+                                        // which of course would make the movement somewhat random!
+                                        if (ARCStartX < ARCEndX) { XMod = 1; } // Move right
+                                        else { XMod = -1; } // Move left
+    
+                                        // Need to find if the X co-ords are even or odd, to 
+                                        // work out how the two potential line-of-sight hexes'
+                                        // Y co-ords are offset (Y & Y+1 for odd X hexes,
+                                        // Y-1 & Y for even hexes)
+                                        var YMod = 0;
+                                        YMod = (ARCStartX % 2); // 0 = even "X" hex, 1 = odd "X" hex
+    
+                                        BTHexX = ARCStartX;
+                                        BTHexY = ARCStartY;
+                                        while ((EndFound == 0) & (Range < MaxRange)) {
+                                            Step++;
+                                            Range++;
+                                            BTHexX = BTHexX + XMod;
+                                            if (YMod == 0) // ARCStartX and ARCEndX are even
+                                            {
+                                                ArcOutString += "Step: " + Step + " Hex (";
+                                                ZeroPad(BTHexX);
+                                                ArcOutString += BTHexX + ",";
+                                                ZeroPad(BTHexY - 1);
+                                                ArcOutString += (BTHexY - 1) + ") OR ";
+                                                XArc[1][Step] = BTHexX;
+                                                YArc[1][Step] = BTHexY;
+                                                // Step++;
+                                                ArcOutString += "Step: " + Step + "(path b) Hex (";
+                                                ZeroPad(BTHexX);
+                                                ArcOutString += BTHexX + ",";
+                                                ZeroPad(BTHexY);
+                                                ArcOutString += (BTHexY) + ")\n";
+                                                XArc[2][Step] = BTHexX;
+                                                YArc[2][Step] = BTHexY + 1;
+                                            }
+                                            else {
+                                                ArcOutString += "Step: " + Step + " Hex (";
+                                                ZeroPad(BTHexX);
+                                                ArcOutString += BTHexX + ",";
+                                                ZeroPad(BTHexY);
+                                                ArcOutString += (BTHexY) + ") OR ";
+                                                XArc[1][Step] = BTHexX;
+                                                YArc[1][Step] = BTHexY;
+                                                // Step++;
+                                                ArcOutString += "Step: " + Step + "(path b) Hex (";
+                                                ZeroPad(BTHexX);
+                                                ArcOutString += BTHexX + ",";
+                                                ZeroPad(BTHexY + 1);
+                                                ArcOutString += (BTHexY + 1) + ")\n";
+                                                XArc[2][Step] = BTHexX;
+                                                YArc[2][Step] = BTHexY - 1;
+                                            }
+                                            Step++;
+                                            Range++;
+                                            BTHexX = BTHexX + XMod;
+                                            ArcOutString += "Step: " + Step + " Hex (";
+                                            ZeroPad(BTHexX);
+                                            ArcOutString += BTHexX + ",";
+                                            ZeroPad(BTHexY);
+                                            ArcOutString += (BTHexY) + ")\n";
+                                            XArc[1][Step] = BTHexX;
+                                            YArc[1][Step] = BTHexY;
+                                            XArc[2][Step] = BTHexX;
+                                            YArc[2][Step] = BTHexY;
+                                            if (BTHexX == ARCEndX) {
+                                                EndFound = 1;
+                                            }
+                                        } // End Kludge loop
+                                    } // End Kludge
+    
+                                    // Main loop of the function
+                                    // Hopefully the while loop below is self-explanatory!
+                                    // The rest of the loop is a straight copy of Zvolsky's
+                                    // Algorithm, so I won't comment it (...much...)
+                                    while ((EndFound == 0) & (Range < MaxRange)) {
+                                        Step++;
+                                        Range++;
+                                        ArcOutString += "Step:" + Step + " ";
+                                        if (Epsilon >= 0) {
+                                            DirX = (XSign * -1);
+                                            DirY = YSign;
+                                            // Need to pass not just the direction we need to move in,
+                                            // but also the current Zvolsky x and y co-ords so the 
+                                            // GetDirection function can return the Zvolsky co-ords
+                                            // for the next hex we're going to move to
+                                            NextX = GetDirectionX(CurrentX, CurrentY, DirX, DirY);
+                                            NextY = GetDirectionY(CurrentX, CurrentY, DirX, DirY);
+    
+                                            CurrentX = NextX;
+                                            CurrentY = NextY;
+                                            Epsilon = Epsilon - ThreeSigmaY - ThreeSigmaX;
+                                        }
+                                        else {
+                                            Epsilon = Epsilon + ThreeSigmaY;
+                                            if (Epsilon > (-1 * SigmaX)) {
+                                                DirX = XSign;
+                                                DirY = YSign;
+                                                NextX = GetDirectionX(CurrentX, CurrentY, DirX, DirY);
+                                                NextY = GetDirectionY(CurrentX, CurrentY, DirX, DirY);
+                                                CurrentX = NextX;
+                                                CurrentY = NextY;
+                                                Epsilon = Epsilon - ThreeSigmaX;
+                                            }
+                                            else {
+                                                if (Epsilon < (-1 * ThreeSigmaX)) {
+                                                    DirX = XSign;
+                                                    DirY = (YSign * -1);
+                                                    NextX = GetDirectionX(CurrentX, CurrentY, DirX, DirY);
+                                                    NextY = GetDirectionY(CurrentX, CurrentY, DirX, DirY);
+                                                    CurrentX = NextX;
+                                                    CurrentY = NextY;
+                                                    Epsilon = Epsilon + ThreeSigmaX;
+                                                }
+                                                else {
+                                                    DirX = 0;
+                                                    DirY = XSign;
+                                                    NextX = GetDirectionX(CurrentX, CurrentY, DirX, DirY);
+                                                    NextY = GetDirectionY(CurrentX, CurrentY, DirX, DirY);
+                                                    CurrentX = NextX;
+                                                    CurrentY = NextY;
+                                                    Epsilon = Epsilon + ThreeSigmaY;
+                                                }
+                                            }
+                                        }
+                                        // Displayed these as part of error checking
+                                        // ArcOutString += "Epsilon:"+Epsilon+" ";
+                                        // ArcOutString += "Dirs["+DirX+"]["+DirY+"]"+" ";
+                                        //Perform the discrimination algorithm here, adding a counter between
+                                        //light terrain +1, heavy terrian +1.5, elevation and dead zone rules KLN
+                                        // Need to convert Zvolsky co-ords back to BTech co-ords
+                                        // for displaying. Again, need to modulus the Btech Y co-ord
+                                        // because we're going from an odd-q layout to an even-q 
+                                        // layout
+                                        BTHexX = CurrentY;
+                                        BTHexY = CurrentX - ((CurrentY + 1) % 2);
+    
+                                        ArcOutString += "Hex (";
+                                        ZeroPad(BTHexX);
+                                        ArcOutString += BTHexX + ",";
+                                        ZeroPad(BTHexY);
+                                        ArcOutString += BTHexY + ")";
+    
+                                        // Put current BTHex X & Y into array
+                                        XArc[ARCPass][Step] = BTHexX;
+                                        YArc[ARCPass][Step] = BTHexY;
+    
+    
+    
+                                        //Try putting the terrainCounter function here
+    
+                                        // Remove the comment markers ("//") on the line below to display
+                                        // the Zvolsky hex co-ords
+                                        // ArcOutString += " [IVHex ("+CurrentX+","+CurrentY+")]";
+    
+                                        // If the epsilon value is zero, it (probably!) means
+                                        // the line-of-sight is passing down a straight edge between
+                                        // two hexes. As per Battletech's rules, defender gets to choose
+                                        // which hex is used as part of line of sight, so we need to
+                                        // display both potential hexes
+                                        //
+                                        // Update 2016-10-10
+                                        // Actually, due to the Kludge code, this bit of code only
+                                        // gets invoked if the LoS "nicks" the edge of two or more
+                                        // hexes (consider the LoS path between 07,09 and 14,16)
+                                        // As such, we no longer need to double check path as path
+                                        // will include all possible hexes.
+                                        if (Epsilon == 0) {
+                                            ArcOutString += " OR ";
+                                            // 2016-10-10 - Two lines below no longer needed
+                                            // DoubleCheck = 1;
+                                            // Range = Range-1;
+                                        }
+                                        else {
+                                            ArcOutString += "\n";
+                                        }
+    
+                                        // Check to see if we have reached the target hex yet
+                                        if ((CurrentX == EndX) && (CurrentY == EndY)) {
+                                            EndFound = 1;
+                                        }
+                                    } // End While Loop
+    
+                                    // The while loop (and the kludge loop) has finished, so display the results
+                                    // If the loop ended because we reached the target hex, display
+                                    // the range, otherwise the loop ended because we hit MaxRange
+                                    // so display a message saying "Out-of-Range"
+                                    Counter = 0;
+                                    EnemyUnits = 1;
+                                    NewArcOutString = "";
+    
+                                    // This bit of code tells us whether the attacking team is black or white
+                                    if (FUnitValue.value < (unitAmt + 1)) {
+                                        teamType = 0;
+                                    } else {
+                                        teamType = 1;
+                                    }
+    
+                                    while (Counter <= Range) {
+                                        //This will determine terrain obstacles
+                                        terrainCount(XArc[1][Counter], YArc[1][Counter]);
+                                        NewArcOutString += "Step:" + Counter + " Hex (";
+                                        NewArcOutString += XArc[1][Counter];
+                                        NewArcOutString += ",";
+                                        NewArcOutString += YArc[1][Counter];
+    
+                                        //This portion checks if additional enemy units are within the current hex
+                                        //and sums the total enemy units within firing arc
+                                        Hit = 0;
+                                        unitType = 0;
+                                        xCurrent = XArc[1][Counter];
+                                        yCurrent = YArc[1][Counter];
+    
+                                        if (Counter > 0) {
+                                            enemyCheck(xCurrent, yCurrent);
+                                        } 
+    
+                                        if ((Hit == 1) && (teamType != unitType) && (Counter < Range)) {
+                                            NewArcOutString += ") additional enemy unit within hex! \n";
+                                            EnemyUnits++;
+                                        } else {
+                                            NewArcOutString += ") \n";
+                                        }
+    
+                                        Counter++;
+    
+                                    }
+    
+                                    if (EndFound == 1) {
+                                        // ArcOutString += "Range: "+Range+"\n";
+                                        NewArcOutString += "Range: " + Range + "\n";
+    
+                                        if (terrainCounter >= 3) {
+                                            NewArcOutString += "LOS is blocked by terrain!! ";
+                                        }
+                                        //Reset the terrainCounter
+                                        terrainCounter = 0;
+                                        // This bit of code distinguishes which face an attack is coming from
+                                        var face;
+    
+                                        if (-Math.PI / 2 > endRadians && endRadians >= -5 * Math.PI / 6) {
+                                            face = "face 1";
+                                        } else if ((5 * Math.PI) / 6 < Math.abs(endRadians) && Math.abs(endRadians) <= Math.PI) {
+                                            face = "face 2";
+                                        } else if ((Math.PI) / 2 < endRadians && endRadians <= (5 * Math.PI) / 6) {
+                                            face = "face 3";
+                                        } else if ((Math.PI) / 6 < endRadians && endRadians <= (Math.PI) / 2) {
+                                            face = "face 4";
+                                        } else if (0 <= Math.abs(endRadians) && Math.abs(endRadians) <= (Math.PI) / 6) {
+                                            face = "face 5";
+                                        } else if (-Math.PI / 6 > endRadians && endRadians >= -Math.PI / 2) {
+                                            face = "face 6";
+                                        } else {
+                                            face = "unknown";
+                                        }
+    
+                                        // Outputs direction of attack on page
+                                        NewArcOutString += "There are " + EnemyUnits + " enemy units within firing arc. \n";
+                                        NewArcOutString += "Original target attacked from direction of " + face;
+                                    }
+                                    else {
+                                        // ArcOutString += "Range: Out-of-Range (> "+(MaxRange)+" Hexes)\n";
+                                        NewArcOutString += "Range: Out-of-Range (> " + (MaxRange) + " Hexes)\n";
+                                        if (terrainCounter >= 3) {
+                                            NewArcOutString += "LOS is blocked by terrain!! ";
+                                        }
+                                        terrainCounter = 0;
+                                    }
+    
+                                    // if (ARCPass == 1)
+                                    // {
+                                    if (unitLosCheck == 1) {
+                                        DrawMarkers(DrawStartX, DrawStartY, DrawEndX, DrawEndY);
+                                    }
+    
+                                    DrawLine(DrawStartX, DrawStartY, DrawEndX, DrawEndY);
+    
+                                    // }
+    
+                                    if ((DoubleCheck == 1) && (ARCPass == 1)) {
+                                        CalculateARC();
+                                    }
+                                    else {
+                                        if (ARCPass == 2) {
+                                            // Passed through the CalculateLOS function twice ('cos we might have two 
+                                            // different LOS paths), so we need to display either the alternate paths
+                                            // (if alternate paths are legit) or display the path with the wrongly
+                                            // flagged hexes removed
+                                            Counter = 0;
+                                            EnemyUnits = 1;
+                                            XArc[2][0] = XArc[1][0];
+                                            YArc[2][0] = YArc[1][0];
+                                            NewArcOutString += "\n\nAlternate Path\n";
+
+                                            while (Counter <= Range) {
+                                                terrainCount(XArc[2][Counter], YArc[2][Counter]);
+                                                NewArcOutString += "Step:" + Counter + " Hex (";
+                                                NewArcOutString += XArc[2][Counter];
+                                                NewArcOutString += ",";
+                                                NewArcOutString += YArc[2][Counter];
+
+                                                //This portion checks if additional enemy units are within the current hex
+                                                //and sums the total enemy units within firing arc
+                                                Hit = 0;
+                                                unitType = 0;
+                                                xCurrent = XArc[2][Counter];
+                                                yCurrent = YArc[2][Counter];
+            
+                                                if (Counter > 0) {
+                                                    enemyCheck(xCurrent, yCurrent);
+                                                } 
+            
+                                                if ((Hit == 1) && (teamType != unitType) && (Counter < Range)) {
+                                                    NewArcOutString += ") additional enemy unit within hex! \n";
+                                                    EnemyUnits++;
+                                                } else {
+                                                    NewArcOutString += ") \n";
+                                                }
+            
+                                                Counter++;
+                                        
+                                            }
+
+                                            if (EndFound == 1) {
+                                                // ArcOutString += "Range: "+Range+"\n";
+                                                NewArcOutString += "Range: " + Range + "\n";
+                                                if (terrainCounter >= 3) {
+                                                NewArcOutString += "LOS is blocked by terrain!! ";
+                                                }
+                                                terrainCounter = 0;
+
+                                                // This bit of code distinguishes which face an attack is coming from
+                                                var face;
+    
+                                                if (-Math.PI / 2 > endRadians && endRadians >= -5 * Math.PI / 6) {
+                                                    face = "face 1";
+                                                } else if ((5 * Math.PI) / 6 < Math.abs(endRadians) && Math.abs(endRadians) <= Math.PI) {
+                                                    face = "face 2";
+                                                } else if ((Math.PI) / 2 < endRadians && endRadians <= (5 * Math.PI) / 6) {
+                                                    face = "face 3";
+                                                } else if ((Math.PI) / 6 < endRadians && endRadians <= (Math.PI) / 2) {
+                                                    face = "face 4";
+                                                } else if (0 <= Math.abs(endRadians) && Math.abs(endRadians) <= (Math.PI) / 6) {
+                                                    face = "face 5";
+                                                } else if (-Math.PI / 6 > endRadians && endRadians >= -Math.PI / 2) {
+                                                    face = "face 6";
+                                                } else {
+                                                    face = "unknown";
+                                                }
+
+                                                 // Outputs direction of attack on page
+                                                NewArcOutString += "There are " + EnemyUnits + " enemy units within firing arc. \n";
+                                                NewArcOutString += "Original target attacked from direction of " + face;
+
+                                            } else {
+                                                // ArcOutString += "Range: Out-of-Range (> "+(MaxRange)+" Hexes)\n";
+                                                NewArcOutString += "Range: Out-of-Range (> " + (MaxRange) + " Hexes)\n";
+                                                if (terrainCounter >= 3) {
+                                                    NewArcOutString += "LOS is blocked by terrain!! ";
+                                                }
+                                                terrainCounter = 0;
+                                            }
+
+                                        }
+                                        // Display Hex Path Info
+                                        // document.getElementById("TextBox").innerHTML = ArcOutString;
+                                        document.getElementById("TextBox").innerHTML = NewArcOutString;
+                                        // Reset ARCPass flag and Path arrays
+                                        ARCPass = 0;
+                                        XArc[1] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+                                        YArc[1] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+                                        XArc[2] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+                                        YArc[2] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+                                    }
+                                }
+    
+                                function DrawMarkers(DrawStartX, DrawStartY, DrawEndX, DrawEndY) {
+    
+                                    // Draw start and end unit markers 
+                                    // Save current state of canvas, as we're going to change the
+                                    // transparency of it when we place the markers
+                                    context.save();
+                                    // Set the transparency to 40%, so we can see the terrain underneath
+                                    // the unit markers
+                                    context.globalAlpha = 0.4;
+                                    // Draw the black and white unit markers
+    
+    
+                                    //Note as important
+                                    context.drawImage(UnitWhite, DrawStartX - (10), DrawStartY - (8), 20, 16);
+                                    context.drawImage(UnitBlack, DrawEndX - (10), DrawEndY - (8), 20, 16);
+                                    // Add labels to the unit markers at 80% transparency
+                                    context.globalAlpha = 0.8;
+                                    context.font = "12px Arial";
+                                    // Black text for the white units
+                                    context.fillStyle = "#000000";
+                                    context.fillText("A", DrawStartX - 4, DrawStartY + 4);
+                                    // White text for the Black units
+                                    context.fillStyle = "#FFFFFF";
+                                    context.fillText("Z", DrawEndX - 4, DrawEndY + 4);
+                                    // Reset the state of the canvas
+                                    context.restore();
+                                }
+    
+                                function DrawLine(DrawStartX, DrawStartY, DrawEndX, DrawEndY) {
+                                    // Variable used for working out rotation required to draw arrowheads
+                                    // on the LoS line
+                                    var endRadians;
+    
+                                    // Draw line on map image
+                                    context.save();
+                                    context.beginPath();
+                                    context.globalAlpha = 0.8;
+                                    context.moveTo(DrawStartX, DrawStartY);
+                                    context.lineTo(DrawEndX, DrawEndY);
+                                    context.strokeStyle = "red";
+                                    context.fillStyle = "red";
+                                    context.lineWidth = 1;
+                                    context.stroke();
+                                    context.closePath();
+                                    context.restore();
+    
+                                    // Draw arrow head on line
+                                    context.save();
+                                    context.beginPath();
+                                    context.globalAlpha = 0.8;
+                                    endRadians = Math.atan((DrawEndY - DrawStartY) / (DrawEndX - DrawStartX));
+                                    endRadians += ((DrawEndX >= DrawStartX) ? 90 : -90) * Math.PI / 180;
+                                    context.translate(DrawEndX, DrawEndY);
+                                    context.rotate(endRadians);
+                                    context.moveTo(0, 0);
+                                    context.lineTo(3, 6);
+                                    context.lineTo(-3, 6);
+                                    context.closePath();
+                                    context.strokeStyle = "red";
+                                    context.fillStyle = "red";
+                                    context.fill();
+                                    context.restore();
+                                }
+    
+    
+                                //This might be the function I need to alter to discriminate each hexagon along our path
+                                function GetDirection(CurrentX, CurrentY, DirI, DirJ) {
+                                    // This function implements Zvolsky's "DIRS" table (Table 1)
+                                    // Probably could be better written, but it works so I'm
+                                    // not overly keen to futz with it!
+                                    var NewX = 0;
+                                    var NewY = 0;
+                                    if (DirI == 0) {
+                                        NewX = CurrentX + DirJ;
+                                        NewY = CurrentY;
+                                    }
+                                    else if (DirI == -1) {
+                                        if ((CurrentY % 2) == 1) {
+                                            NewX = CurrentX;
+                                        }
+                                        else {
+                                            NewX = CurrentX - 1;
+                                        }
+                                        NewY = CurrentY + DirJ;
+                                    }
+                                    else {
+                                        if ((CurrentY % 2) == 1) {
+                                            NewX = CurrentX + 1;
+                                        }
+                                        else {
+                                            NewX = CurrentX;
+                                        }
+                                        NewY = CurrentY + DirJ;
+                                    }
+                                    // Displaying internal workings for error checking
+                                    /*
+                                    OutString +="cX:"+CurrentX+" cY:"+CurrentY+" ";
+                                    OutString +="dI:"+DirI+" dJ:"+DirJ+" ";
+                                    OutString +="nX:"+NewX+" ";
+                                    OutString +="nY:"+NewY+" ";
+                                    */
+                                    return [NewX, NewY];
+                                }
+    
+                                function GetDirectionX(CurrentX, CurrentY, DirI, DirJ) {
+                                    // This function implements Zvolsky's "DIRS" table (Table 1)
+                                    // Probably could be better written, but it works so I'm
+                                    // not overly keen to futz with it!
+                                    var NewX = 0;
+                                    var NewY = 0;
+                                    if (DirI == 0) {
+                                        NewX = CurrentX + DirJ;
+                                        NewY = CurrentY;
+                                    }
+                                    else if (DirI == -1) {
+                                        if ((CurrentY % 2) == 1) {
+                                            NewX = CurrentX;
+                                        }
+                                        else {
+                                            NewX = CurrentX - 1;
+                                        }
+                                        NewY = CurrentY + DirJ;
+                                    }
+                                    else {
+                                        if ((CurrentY % 2) == 1) {
+                                            NewX = CurrentX + 1;
+                                        }
+                                        else {
+                                            NewX = CurrentX;
+                                        }
+                                        NewY = CurrentY + DirJ;
+                                    }
+                                    // Displaying internal workings for error checking
+                                    /*
+                                    OutString +="cX:"+CurrentX+" cY:"+CurrentY+" ";
+                                    OutString +="dI:"+DirI+" dJ:"+DirJ+" ";
+                                    OutString +="nX:"+NewX+" ";
+                                    OutString +="nY:"+NewY+" ";
+                                    */
+                                    return (NewX);
+                                }
+    
+    
+                                //This function will determine dead zones, elevation differences, and terrian obstacles
+                                //such as heavy and light terrain
+                                function terrainCount(battleTechX, battleTechY) {
+                                    //First, we get the battletech coordinates to determine which hexagons might provide obstacles
+                                    //console.log(battleTechX);
+                                    //console.log(battleTechY);
+                                    //To activate the second conditional if red line results in not counting a hexagon. 
+                                    var terrainCountCheck = terrainCounter;
+                                    var startPixX = 0;
+                                    var startPixY = 0;
+                                    startPixX = (battleTechX * 36) / 2;
+    
+                                    startPixY = (((battleTechY - 1) * 42) - (battleTechY / 4) + 20);
+                                    if (battleTechX % 2 == 0) // Offset for even X Btech co-ord hex
+                                    {
+                                        startPixY = startPixY + 20;
+                                    }
+                                    startPixY = startPixY / 2;
+    
+                                    //Pixel 1 information
+                                    var tileData1 = context.getImageData(startPixX - 5, startPixY - 5, 1, 1);
+                                    //Pixel 2 information
+                                    var tileData2 = context.getImageData(startPixX - 1, startPixY - 2, 1, 1);;
+                                    //Pixel 3 information
+                                    var tileData3 = context.getImageData(startPixX, startPixY - 2, 1, 1);
+                                    //Pixel 4 information
+                                    var tileData4 = context.getImageData(startPixX + 5, startPixY - 8, 1, 1);
+    
+                                    //To summarize, pixel locations 1 and 4 determine green/specail type of terrain, 2 and 3 determine
+                                    //Whether light or heavy terrain
+                                    //If we need to determine water tiles, just use the ratio B>G>R
+                                    //Make sure to note that terrainCount can only got up by one per time the function is performed
+                                    //Also, Either need a displacement alogrithm or look at sampling because the line doesnt
+                                    //always intersect at the center of the hexagon
+                                    //Now we need to determine whether heavy/light terrain, water, etc.
+                                    //Use an if/if else statement logic
+    
+                                    //console.log(tileData1.data[1]); 
+                                    //console.log(tileData3);
+                                    if ((tileData1.data[0] != 115) && (tileData2.data[0] != 115) && (tileData3.data[1] != 115) && (tileData4.data[1] != 15)) {
+                                        //If G > R > B (Meaning hopefully green color), pixel indicated only one heavy terrain from pixel 3
+                                        //Works to indicate if a terrain is a special type of terrain 
+                                        if (((tileData1.data[1] > tileData1.data[0]) && (tileData1.data[0] > tileData1.data[2])) ||
+                                            ((tileData4.data[1] > tileData4.data[0]) && (tileData4.data[0] > tileData4.data[2]))) {
+                                            //This if statement will determine if the tile is a light terrain
+                                            //If one of the pixels outputs a brown along the center of the hexagon, its light terrain
+                                            if (((tileData3.data[0] > tileData3.data[1]) && (tileData3.data[1] > tileData3.data[2])) ||
+                                                (tileData2.data[0] > tileData2.data[1]) && (tileData2.data[1] > tileData2.data[2])) {
+                                                terrainCounter++;
+                                                NewArcOutString += "Light Terrain -> ";
+                                                //Add this hexagon to the TerrainType Array for next hexagon of calculation
+                                                terrainType.push(battleTechX, battleTechY, 1);
+                                            }
+                                            //If one of the pixels are red from the line we don't want to include it again, should be uniform 
+                                            //pixel color, pixels 2 and 3 should be affected red pixel color seems to stay at 115
+                                            else {
+                                                //Heavy terrain because no brown pixels
+                                                terrainCounter = terrainCounter + 2;
+                                                NewArcOutString += "Heavy Terrain -> ";
+                                                //Add this hexagon to the TerrainType Array for next hexagon of calculation
+                                                terrainType.push(battleTechX, battleTechY, 2);
+                                            }
+                                            //Make sure to incorporate three new elements for the next set of heavy/light terrain.
+    
+                                        }
+                                    }
+                                    //If we need to determine water tiles, just use the ratio B >G > R for one pixel 
+                                    //Add an extra section to double check terrain elements because the red line can mess up
+                                    //the algorithm if it crosses the exact center of the hexagon ex: 1,5 -> 3,->5 after
+                                    //1,1 -> 5,5
+    
+                                    //We will now make sure that the hexagon was not already accounted for by a previous iteration
+                                    //Each hexagon consists of three elements so we want to itertae by three everytime
+                                    if (terrainCountCheck == terrainCounter) {
+                                        for (var i = 0; i < terrainType.length; i = i + 3) {
+                                            if (battleTechX == terrainType[i] && battleTechY == terrainType[i + 1]) {
+    
+                                                if (terrainType[i + 2] == 1) {
+    
+                                                    terrainCounter++;
+                                                    NewArcOutString += "Light Terrain -> ";
+                                                }
+                                                if (terrainType[i + 2] == 2) {
+    
+                                                    terrainCounter = terrainCounter + 2;
+                                                    NewArcOutString += "Heavy Terrain -> ";
+                                                }
+    
+                                            }
+    
+                                        }
+                                    }
+    
+    
+    
+                                    //}
+                                    //Path test to see if the pixel measurements are in th center of the hexagon
+                                    //Want the center coordinate of each hexagon to used for terrain calculation 
+                                    //Pixel location 1
+                                    //context.drawImage(UnitWhite, startPixX - 5 , startPixY - 5 , 1, 1);
+                                    //Pixel location 2
+                                    //context.drawImage(UnitWhite, startPixX - 1, startPixY - 2 , 1, 1)
+                                    //Pixel Location 3
+                                    //context.drawImage(UnitWhite, startPixX, startPixY - 2, 1, 1);
+                                    //Pixel location 4
+                                    //context.drawImage(UnitWhite, startPixX + 5, startPixY - 8, 1, 1)
+    
+                                    //This section of the function is dedicated for outputting the statement if terrainCounter reaches
+                                    //a value of 3 or higher when calculating the LOS
+    
+    
+    
+                                    //console.log(startPixX);
+                                    //console.log(startPixY);
+                                    //console.log(tileData2);
+                                    //console.log(tileData3);
+                                    //console.log(terrainCounter);
+                                    //console.log(terrainType);
+    
+                                    //find the center of the hexagon\//This website helped with pixel discrimination
+                                    //http://math.hws.edu/graphicsbook/c2/s1.html
+                                    //context.getImageData
+                                    //Now take 3 different points and calculate their pixel RGB value.
+                                    //Determine which type of terrain we are going through
+                                    //and add it to the counter to determine if LOS is possible
+    
+                                }
+                                //This function is almost identical to terrainCount, just modified to get rid of newoutstring error, this function can be gotten 
+                                //rid of if the error can be fixed.
+                                function hexTerrainCount(battleTechX, battleTechY) {
+                                    var terrainCountCheck = terrainCounter;
+                                    var startPixX = 0;
+                                    var startPixY = 0;
+                                    startPixX = (battleTechX * 36) / 2;
+    
+                                    startPixY = (((battleTechY - 1) * 42) - (battleTechY / 4) + 20);
+                                    if (battleTechX % 2 == 0) // Offset for even X Btech co-ord hex
+                                    {
+                                        startPixY = startPixY + 20;
+                                    }
+                                    startPixY = startPixY / 2;
+    
+                                    //Pixel 1 information
+                                    var tileData1 = context.getImageData(startPixX - 5, startPixY - 5, 1, 1);
+                                    //Pixel 2 information
+                                    var tileData2 = context.getImageData(startPixX - 1, startPixY - 2, 1, 1);;
+                                    //Pixel 3 information
+                                    var tileData3 = context.getImageData(startPixX, startPixY - 2, 1, 1);
+                                    //Pixel 4 information
+                                    var tileData4 = context.getImageData(startPixX + 5, startPixY - 8, 1, 1);
+    
+                                    //To summarize, pixel locations 1 and 4 determine green/specail type of terrain, 2 and 3 determine
+                                    //Whether light or heavy terrain
+                                    //If we need to determine water tiles, just use the ratio B>G>R
+                                    //Make sure to note that terrainCount can only got up by one per time the function is performed
+                                    //Also, Either need a displacement alogrithm or look at sampling because the line doesnt
+                                    //always intersect at the center of the hexagon
+                                    //Now we need to determine whether heavy/light terrain, water, etc.
+                                    //Use an if/if else statement logic
+    
+                                    //console.log(tileData1.data[1]); 
+                                    //console.log(tileData3);
+                                    if ((tileData1.data[0] != 115) && (tileData2.data[0] != 115) && (tileData3.data[1] != 115) && (tileData4.data[1] != 15)) {
+                                        //If G > R > B (Meaning hopefully green color), pixel indicated only one heavy terrain from pixel 3
+                                        //Works to indicate if a terrain is a special type of terrain 
+                                        if (((tileData1.data[1] > tileData1.data[0]) && (tileData1.data[0] > tileData1.data[2])) ||
+                                            ((tileData4.data[1] > tileData4.data[0]) && (tileData4.data[0] > tileData4.data[2]))) {
+                                            //This if statement will determine if the tile is a light terrain
+                                            //If one of the pixels outputs a brown along the center of the hexagon, its light terrain
+                                            if (((tileData3.data[0] > tileData3.data[1]) && (tileData3.data[1] > tileData3.data[2])) ||
+                                                (tileData2.data[0] > tileData2.data[1]) && (tileData2.data[1] > tileData2.data[2])) {
+                                                
+                                                //Add this hexagon to the TerrainType Array for next hexagon of calculation
+                                                terrainType.push(battleTechX, battleTechY, 1);
+                                            }
+                                            //If one of the pixels are red from the line we don't want to include it again, should be uniform 
+                                            //pixel color, pixels 2 and 3 should be affected red pixel color seems to stay at 115
+                                            else {
+                                                //Heavy terrain because no brown pixels
+                                                
+                                                //Add this hexagon to the TerrainType Array for next hexagon of calculation
+                                                terrainType.push(battleTechX, battleTechY, 2);
+                                            }
+                                            //Make sure to incorporate three new elements for the next set of heavy/light terrain.
+    
+                                        }
+                                    }
+                                }
+    
+                                function GetDirectionY(CurrentX, CurrentY, DirI, DirJ) {
+                                    // This function implements Zvolsky's "DIRS" table (Table 1)
+                                    // Probably could be better written, but it works so I'm
+                                    // not overly keen to futz with it!
+                                    var NewX = 0;
+                                    var NewY = 0;
+                                    if (DirI == 0) {
+                                        NewX = CurrentX + DirJ;
+                                        NewY = CurrentY;
+                                    }
+                                    else if (DirI == -1) {
+                                        if ((CurrentY % 2) == 1) {
+                                            NewX = CurrentX;
+                                        }
+                                        else {
+                                            NewX = CurrentX - 1;
+                                        }
+                                        NewY = CurrentY + DirJ;
+                                    }
+                                    else {
+                                        if ((CurrentY % 2) == 1) {
+                                            NewX = CurrentX + 1;
+                                        }
+                                        else {
+                                            NewX = CurrentX;
+                                        }
+                                        NewY = CurrentY + DirJ;
+                                    }
+                                    // Displaying internal workings for error checking
+                                    /*
+                                    OutString +="cX:"+CurrentX+" cY:"+CurrentY+" ";
+                                    OutString +="dI:"+DirI+" dJ:"+DirJ+" ";
+                                    OutString +="nX:"+NewX+" ";
+                                    OutString +="nY:"+NewY+" ";
+                                    */
+                                    return (NewY);
+                                }
+    
+                                function ZeroPad(PadNum) {
+                                    if (PadNum < 10) {
+                                        OutString += "0";
+                                    }
+                                    return true;
+                                }
+    
+                                function enemyCheck(xCurrent, yCurrent) {
+                                    // TAMU: This function searches the array holding each team's 
+                                    // BattleMech's and compares each set of coordinates with the 
+                                    // coordinates of the current Hex within the LoS algorithm
+                                    // when this function is called
+    
+                                    Hit = 0;
+    
+                                    for (var i = 0; i < (storeHexVal.length + 1); i = i + 4) {
+                                        xCoord = storeHexVal[i + 2];
+                                        yCoord = storeHexVal[i + 3];
+    
+                                        if ((xCurrent == xCoord) && (yCurrent == yCoord)) {
+                                            Hit = 1;
+                                            unitType = storeHexVal[i];
+                                        } 
+    
+                                    }
+    
+                                    return [Hit, unitType];
+    
+                                }
+    
+                            </SCRIPT>
+    </BODY>
+    
+    </HTML>
